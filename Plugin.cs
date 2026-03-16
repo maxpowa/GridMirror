@@ -1,7 +1,12 @@
+using System.Linq;
+using System.Reflection;
 using Sandbox.Game.SessionComponents.Clipboard;
+using Sandbox.Graphics.GUI;
 using Sandbox.ModAPI;
+using GridMirror.Settings;
+using GridMirror.Settings.Layouts;
 using VRage.Game;
-using VRage.Game.ModAPI;
+using VRage.Input;
 using VRage.Plugins;
 using VRageMath;
 
@@ -9,202 +14,96 @@ namespace GridMirror;
 
 public class Plugin : IPlugin
 {
-    private const string CmdPrefix = "/mirror";
-    private bool _hooked;
+    public const string Name = "GridMirror";
+    public static Plugin Instance { get; private set; }
+    private SettingsGenerator settingsGenerator;
 
     public void Init(object gameInstance)
     {
+        Instance = this;
+        Instance.settingsGenerator = new SettingsGenerator();
     }
 
     public void Update()
     {
-        if (!_hooked && MyAPIGateway.Utilities != null)
-        {
-            MyAPIGateway.Utilities.MessageEnteredSender += OnMessageEntered;
-            _hooked = true;
-        }
+        var input = MyInput.Static;
+        if (input == null)
+            return;
+
+        var clipComp = MyClipboardComponent.Static;
+        if (clipComp?.Clipboard == null || !clipComp.Clipboard.IsActive)
+            return;
+
+        var config = Config.Current;
+
+        if (config.MirrorX.HasPressed(input))
+            ExecuteMirror(MirrorAxis.X);
+        else if (config.MirrorY.HasPressed(input))
+            ExecuteMirror(MirrorAxis.Y);
+        else if (config.MirrorZ.HasPressed(input))
+            ExecuteMirror(MirrorAxis.Z);
     }
 
     public void Dispose()
     {
-        if (_hooked)
-        {
-            MyAPIGateway.Utilities.MessageEnteredSender -= OnMessageEntered;
-            _hooked = false;
-        }
+        Instance = null;
     }
 
-    private void OnMessageEntered(ulong sender, string messageText, ref bool sendToOthers)
+    public void OpenConfigDialog()
     {
-        if (!messageText.StartsWith(CmdPrefix, System.StringComparison.OrdinalIgnoreCase))
-            return;
-
-        sendToOthers = false;
-
-        if (MyAPIGateway.Session == null)
-            return;
-
-        if (!MyAPIGateway.Session.CreativeMode && !MyAPIGateway.Session.HasCreativeRights)
-        {
-            ShowMessage("Creative tools must be enabled to use mirror commands.");
-            return;
-        }
-
-        var parts = messageText.Split(' ');
-
-        if (parts.Length > 1 && parts[1].Equals("help", System.StringComparison.OrdinalIgnoreCase))
-        {
-            ShowHelp();
-            return;
-        }
-
-        var axis = MirrorAxis.X;
-
-        if (parts.Length > 1)
-        {
-            switch (parts[1].ToUpperInvariant())
-            {
-                case "X": axis = MirrorAxis.X; break;
-                case "Y": axis = MirrorAxis.Y; break;
-                case "Z": axis = MirrorAxis.Z; break;
-                default:
-                    ShowMessage("Unknown axis: " + parts[1] + ". Use X, Y, or Z.");
-                    return;
-            }
-        }
-
-        ExecuteMirror(axis);
+        Instance.settingsGenerator.SetLayout<Simple>();
+        MyGuiSandbox.AddScreen(Instance.settingsGenerator.Dialog);
     }
 
     private static void ExecuteMirror(MirrorAxis axis)
     {
-        var grid = GetTargetGrid();
-        if (grid == null)
-        {
-            ShowMessage("No grid found. Look at a grid.");
+        if (MyAPIGateway.Session == null)
             return;
-        }
-
-        var player = MyAPIGateway.Session?.Player;
-        if (player == null)
-            return;
-
-        if (!CanCopyGrid(grid, player))
-        {
-            ShowMessage("You don't have permission to copy this grid.");
-            return;
-        }
-
-        var result = GridMirror.Mirror(grid, axis);
-
-        if (result.MirroredGrid == null)
-        {
-            ShowMessage("Mirror failed — grid has no blocks.");
-            return;
-        }
 
         var clipComp = MyClipboardComponent.Static;
-        if (clipComp?.Clipboard == null)
+        if (!clipComp.Clipboard.HasCopiedGrids())
         {
-            ShowMessage("Clipboard unavailable.");
+            ShowMessage("No grid on clipboard. Copy a grid first (Ctrl+C).");
             return;
         }
 
-        var playerPos = player.GetPosition();
-        var gridPos = grid.WorldMatrix.Translation;
-        var distance = (float)(gridPos - playerPos).Length();
+        var copiedGrids = clipComp.Clipboard.CopiedGrids;
+        var mirroredGrids = new MyObjectBuilder_CubeGrid[copiedGrids.Count];
+        int totalBlocks = 0;
+
+        for (int i = 0; i < copiedGrids.Count; i++)
+        {
+            var gridBuilder = (MyObjectBuilder_CubeGrid)copiedGrids[i].Clone();
+            var result = GridMirror.Mirror(gridBuilder, axis);
+            if (result.MirroredGrid == null)
+            {
+                ShowMessage("Mirror failed — grid has no blocks.");
+                return;
+            }
+            mirroredGrids[i] = result.MirroredGrid;
+            totalBlocks += result.BlocksMirrored;
+        }
+
+        var clipType = clipComp.Clipboard.GetType();
+        var dragLength = (float)(clipType.GetField("m_dragDistance", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(clipComp.Clipboard) ?? 0f);
+
+        var firstGrid = mirroredGrids[0];
+        var firstBlock = firstGrid.CubeBlocks.FirstOrDefault();
+        var gridSize = firstGrid.GridSizeEnum == MyCubeSize.Large ? 2.5f : 0.5f;
+        var dragDelta = firstBlock != null ? -new Vector3(firstBlock.Min) * gridSize : Vector3.Zero;
 
         clipComp.Clipboard.SetGridFromBuilders(
-            new MyObjectBuilder_CubeGrid[] { result.MirroredGrid },
-            Vector3.Zero,
-            distance,
-            false);
+            mirroredGrids,
+            dragDelta,
+            dragLength,
+            true);
         clipComp.Clipboard.Activate(null);
 
-        ShowMessage("Axis: " + axis + ". " + result + ". Grid copied to clipboard — paste with Ctrl+V.");
-    }
-
-    private static bool CanCopyGrid(IMyCubeGrid grid, IMyPlayer player)
-    {
-        var playerId = player.IdentityId;
-
-        if (player.PromoteLevel >= MyPromoteLevel.Admin)
-            return true;
-
-        var blocks = new System.Collections.Generic.List<IMySlimBlock>();
-        grid.GetBlocks(blocks);
-
-        if (blocks.Count == 0)
-            return true;
-
-        var playerFaction = MyAPIGateway.Session.Factions.TryGetPlayerFaction(playerId);
-        int ownedOrShared = 0;
-
-        foreach (var slim in blocks)
-        {
-            if (slim.FatBlock == null)
-            {
-                ownedOrShared++;
-                continue;
-            }
-
-            long ownerId = slim.FatBlock.OwnerId;
-
-            if (ownerId == 0 || ownerId == playerId)
-            {
-                ownedOrShared++;
-                continue;
-            }
-
-            if (playerFaction != null)
-            {
-                var ownerFaction = MyAPIGateway.Session.Factions.TryGetPlayerFaction(ownerId);
-                if (ownerFaction != null && playerFaction.FactionId == ownerFaction.FactionId)
-                {
-                    ownedOrShared++;
-                    continue;
-                }
-            }
-
-            var relation = slim.FatBlock.GetUserRelationToOwner(playerId);
-            if (relation != VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies)
-            {
-                ownedOrShared++;
-            }
-        }
-
-        return ownedOrShared > blocks.Count / 2;
-    }
-
-    private static IMyCubeGrid GetTargetGrid()
-    {
-        var camera = MyAPIGateway.Session?.Camera;
-        if (camera != null)
-        {
-            var from = camera.WorldMatrix.Translation;
-            var to = from + camera.WorldMatrix.Forward * 200;
-
-            IHitInfo hit;
-            if (MyAPIGateway.Physics.CastRay(from, to, out hit))
-            {
-                if (hit.HitEntity is IMyCubeGrid hitGrid)
-                    return hitGrid;
-            }
-        }
-
-        return null!;
+        ShowMessage("Axis: " + axis + ". Blocks mirrored: " + totalBlocks);
     }
 
     private static void ShowMessage(string text)
     {
-        MyAPIGateway.Utilities.ShowMessage("Mirror", text);
-    }
-
-    private static void ShowHelp()
-    {
-        ShowMessage("Usage: /mirror [X|Y|Z]");
-        ShowMessage("  X = left/right, Y = up/down, Z = forward/back");
-        ShowMessage("  Look at the target grid.");
-        ShowMessage("  Mirrored grid is copied to clipboard for pasting.");
+        MyAPIGateway.Utilities?.ShowMessage(Name, text);
     }
 }

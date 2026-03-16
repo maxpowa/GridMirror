@@ -16,7 +16,14 @@
     <PackageId>Plugin.GridMirror</PackageId>
     <AssemblyName>Plugin.GridMirror</AssemblyName>
     <Title>Grid Mirror</Title>
-    <Description>Mirror Space Engineers grids and place them on your clipboard</Description>
+    <Description>Mirrors the grid on your clipboard along the X, Y, or Z axis using configurable hotkeys.
+
+Usage:
+  1. Copy a grid (Ctrl+C).
+  2. "Paste" (Ctrl+V) the grid to enable paste mode and show the ghost preview.
+  3. Press the configured hotkey to mirror along the desired axis. (Default: Ctrl+Shift+X to mirror along the X axis.)
+
+Configure hotkeys in the plugin settings dialog.</Description>
     <LangVersion>preview</LangVersion>
     <RootNamespace>GridMirror</RootNamespace>
     <PackageIcon>icon.png</PackageIcon>

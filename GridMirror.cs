@@ -2,8 +2,6 @@ using Sandbox.Definitions;
 using Sandbox.ModAPI;
 using VRage;
 using VRage.Game;
-using VRage.Game.ModAPI;
-using VRage.ObjectBuilders;
 using VRageMath;
 
 namespace GridMirror
@@ -23,11 +21,9 @@ namespace GridMirror
 
     public static class GridMirror
     {
-        public static MirrorResult Mirror(IMyCubeGrid grid, MirrorAxis axis)
+        public static MirrorResult Mirror(MyObjectBuilder_CubeGrid gridBuilder, MirrorAxis axis)
         {
             var result = new MirrorResult();
-
-            var gridBuilder = (MyObjectBuilder_CubeGrid)grid.GetObjectBuilder();
 
             if (gridBuilder.CubeBlocks == null || gridBuilder.CubeBlocks.Count == 0)
                 return result;
@@ -67,8 +63,6 @@ namespace GridMirror
             gridBuilder.CubeBlocks.AddRange(mirroredBlocks);
 
             MyAPIGateway.Entities.RemapObjectBuilder(gridBuilder);
-
-            gridBuilder.PositionAndOrientation = new MyPositionAndOrientation(grid.WorldMatrix);
 
             result.MirroredGrid = gridBuilder;
             return result;

@@ -23,6 +23,10 @@
       <HintPath>$(SEInstallPath)\Sandbox.Game.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="Sandbox.Graphics">
+      <HintPath>$(SEInstallPath)\Sandbox.Graphics.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="SpaceEngineers.ObjectBuilders">
       <HintPath>$(SEInstallPath)\SpaceEngineers.ObjectBuilders.dll</HintPath>
       <Private>false</Private>
@@ -33,6 +37,10 @@
     </Reference>
     <Reference Include="VRage.Game">
       <HintPath>$(SEInstallPath)\VRage.Game.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="VRage.Input">
+      <HintPath>$(SEInstallPath)\VRage.Input.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="VRage.Library">
