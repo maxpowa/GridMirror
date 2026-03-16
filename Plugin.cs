@@ -110,10 +110,14 @@ public class Plugin : IPlugin
             return;
         }
 
+        var playerPos = player.GetPosition();
+        var gridPos = grid.WorldMatrix.Translation;
+        var distance = (float)(gridPos - playerPos).Length();
+
         clipComp.Clipboard.SetGridFromBuilders(
             new MyObjectBuilder_CubeGrid[] { result.MirroredGrid },
             Vector3.Zero,
-            0f,
+            distance,
             false);
         clipComp.Clipboard.Activate(null);
 
