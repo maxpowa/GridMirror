@@ -4,23 +4,18 @@
 
 # GridMirror
 
-A Space Engineers plugin that mirrors grids along an axis and copies the result to your clipboard for pasting.
-
-## Requirements
-
-- Creative mode or creative tools enabled
+A Space Engineers plugin that mirrors the grid on your clipboard along the X, Y, or Z axis using configurable hotkeys.
 
 ## Usage
 
-1. Look at the grid you want to mirror
-2. Type `/mirror [axis]` in chat
+1. Copy a grid (**Ctrl+C**)
+2. "Paste" (**Ctrl+V**) the grid to enable paste mode and show the ghost preview
+3. Press the configured hotkey to mirror along the desired axis
 
-| Command | Description |
+| Default Hotkey | Axis |
 |---|---|
-| `/mirror` | Mirror along X axis (default) |
-| `/mirror X` | Mirror left/right |
-| `/mirror Y` | Mirror up/down |
-| `/mirror Z` | Mirror forward/back |
-| `/mirror help` | Show help |
+| **Ctrl+Shift+X** | Mirror left/right (X) |
+| **_Unbound_**      | Mirror up/down (Y) |
+| **_Unbound_**      | Mirror forward/back (Z) |
 
-3. The mirrored grid is placed on your clipboard — paste it with **Ctrl+V**
+Configure hotkeys for all axes in the plugin settings dialog.
